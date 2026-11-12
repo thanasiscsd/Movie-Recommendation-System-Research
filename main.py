@@ -525,7 +525,6 @@ def create_json(): #function that creates json file
         return
 
     api_key=keys.TMDB_API_KEY
-    read_key=keys.TMDB_READ_TOKEN
 
     movie_list=[]
 
@@ -683,39 +682,41 @@ def run_ui():
         print(f"• {rec_title:<40} (Match: {rec_score:.1f}%)")
 
 
-print("Building recommendation model, please wait...")
+if __name__=="__main__":
 
-create_json()
+    print("Building recommendation model, please wait...")
 
-df = pd.read_json("tmdb_dataset.json") #Read json file
+    create_json()
 
-create_ratings_file(df) #use cf.py file
+    df = pd.read_json("tmdb_dataset.json") #Read json file
 
-create_movie_vectors_file() #use word2vec.py file
+    create_ratings_file(df) #use cf.py file
 
-movie_vectors=np.load("movie_vectors.npy")
+    create_movie_vectors_file() #use word2vec.py file
 
-with open("ratings.pkl", "rb") as f:
-    movie_voters, user_ratings, user_means = pickle.load(f)
+    movie_vectors=np.load("movie_vectors.npy")
 
-overview_index,movieTF_IDF,movie_norms=build_overview_index(df)
+    with open("ratings.pkl", "rb") as f:
+        movie_voters, user_ratings, user_means = pickle.load(f)
 
-movie_genres,genre_index,genre_weights,movie_weights=build_genre_index(df)
+    overview_index,movieTF_IDF,movie_norms=build_overview_index(df)
 
-cast_index=build_cast_index(df)
+    movie_genres,genre_index,genre_weights,movie_weights=build_genre_index(df)
 
-calculate_statistics(df,overview_index,movieTF_IDF,movie_norms,movie_genres,genre_index,genre_weights,movie_weights,movie_voters,user_ratings,user_means,movie_vectors)
+    cast_index=build_cast_index(df)
 
-with open("statistics.pkl", "rb") as f:
+    calculate_statistics(df,overview_index,movieTF_IDF,movie_norms,movie_genres,genre_index,genre_weights,movie_weights,movie_voters,user_ratings,user_means,movie_vectors)
 
-    (overview_mean,genre_mean,cf_item_mean,word2vec_mean,overview_std,genre_std,cf_item_std,word2vec_std)=pickle.load(f)
+    with open("statistics.pkl", "rb") as f:
 
-print("Model ready!\n")
+        (overview_mean,genre_mean,cf_item_mean,word2vec_mean,overview_std,genre_std,cf_item_std,word2vec_std)=pickle.load(f)
 
-display_titles=df["display_title"].copy()
+    print("Model ready!\n")
 
-available_titles = display_titles.dropna().tolist()  # list of all available (non-empty) titles
+    display_titles=df["display_title"].copy()
 
-while True:
-    run_ui() #only works in terminal
+    available_titles = display_titles.dropna().tolist()  # list of all available (non-empty) titles
+
+    while True:
+        run_ui() #only works in terminal
 
