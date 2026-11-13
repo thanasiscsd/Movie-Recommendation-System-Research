@@ -717,6 +717,8 @@ if __name__=="__main__":
 
     available_titles = display_titles.dropna().tolist()  # list of all available (non-empty) titles
 
+    del display_titles #no use anymore
+
     while True:
         run_ui() #only works in terminal
 

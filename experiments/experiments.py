@@ -29,11 +29,16 @@ def create_movie_voters(user_ratings):
 
 # 80% training, 10% validation, 10% test
 
-def create_split_ratings_files(user_ratings):
+def create_split_ratings_files():
     split_path = os.path.join(EXPERIMENTS_DIR, "ratings_split.pkl")
     if os.path.exists(split_path): #if file already exists, return
 
         return
+
+    with open("ratings.pkl", "rb") as f:  # get user_ratings from ratings.pkl
+        movie_voters, user_ratings, user_means = pickle.load(f)
+        del movie_voters
+        del user_means
 
     seed=25 #use standard seed
     rng = np.random.default_rng(seed) #use seed for numpy
@@ -72,6 +77,8 @@ def create_split_ratings_files(user_ratings):
         validation_user_ratings[user_id] = dict(validation_items)
         test_user_ratings[user_id] = dict(test_items)
 
+    del user_ratings #no use after this point, free RAM
+
     # Do the same for movie voters
 
     train_movie_voters=create_movie_voters(train_user_ratings)
@@ -100,11 +107,9 @@ df = pd.read_json("tmdb_dataset.json") #Read json file
 
 create_ratings_file(df) #use cf.py file
 
-with open("ratings.pkl", "rb") as f: #get user_ratings from ratings.pkl
-    _,user_ratings,_ = pickle.load(f)
-
 #read file and load data
-create_split_ratings_files(user_ratings)
+create_split_ratings_files()
+
 with open(os.path.join(EXPERIMENTS_DIR, "ratings_split.pkl"), "rb") as f:
     train_user_ratings, train_movie_voters, train_user_means,validation_movie_voters, validation_user_ratings, test_user_ratings, test_movie_voters = pickle.load(f)
 
