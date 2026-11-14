@@ -101,34 +101,122 @@ def create_split_ratings_files():
     print("ratings_split.pkl successfully created")
 
 
-create_json()
 
-df = pd.read_json("tmdb_dataset.json") #Read json file
+def check_split_ratings_overlap(train_user_ratings, validation_user_ratings, test_user_ratings): #function checks if a rating (user_id,movie_index) exists in more than one set
 
-create_ratings_file(df) #use cf.py file
+    # user_ratings has shape: {key: user_id, value: {movie_index:rating}
 
-#read file and load data
-create_split_ratings_files()
+    for user_id, ratings in train_user_ratings.items():
 
-with open(os.path.join(EXPERIMENTS_DIR, "ratings_split.pkl"), "rb") as f:
-    train_user_ratings, train_movie_voters, train_user_means,validation_movie_voters, validation_user_ratings, test_user_ratings, test_movie_voters = pickle.load(f)
+        if user_id in validation_user_ratings: #if user exists in both train set and validation set
 
-print("\nDataset statistics:")
+            if ratings.keys() & validation_user_ratings[user_id].keys(): #ratings.keys() for the movie_indices in train set, validation_user_ratings[user_id].keys() for the movie_indices in validation set
+                print("\nError, Train-Validation Overlap Found")
+                return
 
-print(f"Train:")
-print(f"  Users: {len(train_user_ratings):,}")
-print(f"  Movies: {len(train_movie_voters):,}")
-print(f"  Ratings: {sum(len(ratings) for ratings in train_user_ratings.values()):,}")
+        if user_id in test_user_ratings: #if user exists in both train set and test set
 
-print(f"\nValidation:")
-print(f"  Users: {len(validation_user_ratings):,}")
-print(f"  Movies: {len(validation_movie_voters):,}")
-print(f"  Ratings: {sum(len(ratings) for ratings in validation_user_ratings.values()):,}")
+            if ratings.keys() & test_user_ratings[user_id].keys(): #ratings.keys() for the movie_indices in train set, test_user_ratings[user_id].keys() for the movie_indices in test set
+                print("\nError, Train-Test Overlap Found")
+                return
 
-print(f"\nTest:")
-print(f"  Users: {len(test_user_ratings):,}")
-print(f"  Movies: {len(test_movie_voters):,}")
-print(f"  Ratings: {sum(len(ratings) for ratings in test_user_ratings.values()):,}")
+    for user_id, ratings in validation_user_ratings.items():
+
+        if user_id in test_user_ratings: #if user exists in both validation set and test set
+
+            if ratings.keys() & test_user_ratings[user_id].keys(): #ratings.keys() for the movie_indices in validation set, test_user_ratings[user_id].keys() for the movie_indices in test set
+                print("\nError, Validation-Test Overlap Found")
+                return
+
+    print("\nNo Overlapping Found")
+    return
+
+
+def check_cold_start_movies(train_movie_voters, validation_movie_voters, test_movie_voters): #function checks the number of movies appearing in validation or test set, without being in train set
+
+
+    # movie_voters has shape: {key: movie_index, value: {user_id:rating}
+
+    # we only care about movie_index
+
+    train_movies=train_movie_voters.keys()
+    validation_movies=validation_movie_voters.keys()
+    test_movies=test_movie_voters.keys()
+
+    validation_test_movies=validation_movies | test_movies
+
+    cold_start_movies=validation_test_movies-train_movies
+
+    n_cold_start_movies=len(cold_start_movies)
+
+    total=len(validation_test_movies)
+
+    percentage_cold_start_movies=n_cold_start_movies/total*100
+
+    print(f"\nMovies appearing in validation or test set, but not in train set: {n_cold_start_movies}")
+
+    print(f"\nCold start movie percentage: {percentage_cold_start_movies:.2f}%")
+
+
+
+
+
+def check_split_ratings_details():
+
+    create_json()
+
+    df = pd.read_json("tmdb_dataset.json")  # Read json file
+
+    create_ratings_file(df)  # use cf.py file
+
+    # read file and load data
+    create_split_ratings_files()
+
+    with open(os.path.join(EXPERIMENTS_DIR, "ratings_split.pkl"), "rb") as f:
+        train_user_ratings, train_movie_voters, train_user_means, validation_movie_voters, validation_user_ratings, test_user_ratings, test_movie_voters = pickle.load(f)
+
+    train_count=sum(len(ratings) for ratings in train_user_ratings.values())
+    validation_count=sum(len(ratings) for ratings in validation_user_ratings.values())
+    test_count=sum(len(ratings) for ratings in test_user_ratings.values())
+
+    total_count=train_count+validation_count+test_count
+
+
+    print("\nDataset statistics:\n")
+
+    print(f"Train Set:")
+    print(f"  Users: {len(train_user_ratings):,}")
+    print(f"  Movies: {len(train_movie_voters):,}")
+    print(f"  Ratings: {train_count:,}")
+
+    print(f"\nValidation Set:")
+    print(f"  Users: {len(validation_user_ratings):,}")
+    print(f"  Movies: {len(validation_movie_voters):,}")
+    print(f"  Ratings: { validation_count:,}")
+
+    print(f"\nTest Set:")
+    print(f"  Users: {len(test_user_ratings):,}")
+    print(f"  Movies: {len(test_movie_voters):,}")
+    print(f"  Ratings: {test_count:,}")
+
+    #Calculate percentages
+    train_percentage=train_count/total_count*100
+    validation_percentage=validation_count/total_count*100
+    test_percentage=test_count/total_count*100
+
+    print("\nRatings Distribution:")
+    print(f"  Train Set:       {train_percentage:.2f}%")
+    print(f"  Validation Set:  {validation_percentage:.2f}%")
+    print(f"  Test Set:        {test_percentage:.2f}%")
+
+    check_split_ratings_overlap(train_user_ratings, validation_user_ratings, test_user_ratings)
+    check_cold_start_movies(train_movie_voters, validation_movie_voters, test_movie_voters)
+
+
+
+
+check_split_ratings_details()
+
 
 
 

@@ -694,7 +694,7 @@ if __name__=="__main__":
 
     create_movie_vectors_file() #use word2vec.py file
 
-    movie_vectors=np.load("movie_vectors.npy")
+    movie_vectors=np.load("movie_vectors.npy",mmap_mode="r")
 
     with open("ratings.pkl", "rb") as f:
         movie_voters, user_ratings, user_means = pickle.load(f)

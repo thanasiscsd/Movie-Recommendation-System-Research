@@ -28,6 +28,8 @@ def create_pseudo_ratings(movie_index,content_scores,movie_voters,user_ratings,u
 
     sorted_valid_movies=sorted(valid_movies,key=lambda x:x[1],reverse=True)[:20] #sort according to score
 
+    del valid_movies #no use anymore, free RAM
+
 
     for movie_id,score in sorted_valid_movies: #for each movie
 
@@ -49,6 +51,8 @@ def create_pseudo_ratings(movie_index,content_scores,movie_voters,user_ratings,u
                      pseudo_ratings[cf_movie_id]=0.0 #initialize
 
                 pseudo_ratings[cf_movie_id] +=centered_rating*cf_centered_rating*(score**2) #add scores, (score^2) for more content heavy
+
+    del sorted_valid_movies #no use anymore, free RAM
 
     pseudo_ratings={movie_id:score for movie_id,score in pseudo_ratings.items() #keep only positive ratings
                     if score>0}
@@ -76,6 +80,8 @@ def find_item_based_similarity(movie_index,movie_voters,user_ratings,user_means,
     target_votes_centered={user_id: rating - user_means[user_id]
                            for user_id, rating in target_votes.items()
                            if user_id in user_ratings}
+
+    del target_votes #no use anymore, free RAM
 
     target_norm=math.sqrt(sum(r ** 2 for r in target_votes_centered.values())) # ||A||
 
@@ -111,7 +117,7 @@ def find_item_based_similarity(movie_index,movie_voters,user_ratings,user_means,
                         movie_stats[user_movie_index][1] += diff**2
                         movie_stats[user_movie_index][2] += 1
 
-
+    del target_votes_centered #no use anymore, free RAM
 
     similarities={}
 
