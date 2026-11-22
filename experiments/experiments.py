@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pickle
 import os
-from cf import create_ratings_file
+from cf import create_ratings_file,create_similarities_file,predict_rating
 from main import create_json
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -137,7 +137,7 @@ def check_cold_start_movies(train_movie_voters, validation_movie_voters, test_mo
 
     # movie_voters has shape: {key: movie_index, value: {user_id:rating}
 
-    # we only care about movie_index
+    # get about movie_index
 
     train_movies=train_movie_voters.keys()
     validation_movies=validation_movie_voters.keys()
@@ -149,13 +149,39 @@ def check_cold_start_movies(train_movie_voters, validation_movie_voters, test_mo
 
     n_cold_start_movies=len(cold_start_movies)
 
-    total=len(validation_test_movies)
+    n_test_cold_start_reviews=(
+        sum(len(test_movie_voters[movie_index])
+            for movie_index in cold_start_movies
+            if movie_index in test_movie_voters))
 
-    percentage_cold_start_movies=n_cold_start_movies/total*100
+    n_validation_cold_start_reviews=(
+        sum(len(validation_movie_voters[movie_index])
+            for movie_index in cold_start_movies
+            if movie_index in validation_movie_voters))
 
-    print(f"\nMovies appearing in validation or test set, but not in train set: {n_cold_start_movies}")
+    n_cold_start_reviews=n_test_cold_start_reviews+n_validation_cold_start_reviews
+
+    total_movies=len(validation_test_movies)
+
+    n_validation_reviews=sum(len(voters) for voters in validation_movie_voters.values())
+
+    n_test_reviews=sum(len(voters) for voters in test_movie_voters.values())
+
+    total_reviews=n_validation_reviews+n_test_reviews
+
+    percentage_cold_start_movies=n_cold_start_movies/total_movies*100
+
+    percentage_cold_start_reviews=n_cold_start_reviews/total_reviews*100
+
+    print(f"\nMovies appearing in validation or test set, but not in train set (Cold start movies) : {n_cold_start_movies}")
 
     print(f"\nCold start movie percentage: {percentage_cold_start_movies:.2f}%")
+
+    print(f"\nCold start ratings: {n_cold_start_reviews}")
+
+    print(f"\nCold start ratings percentage: {percentage_cold_start_reviews:.6f}%")
+
+    return cold_start_movies
 
 
 
@@ -210,12 +236,114 @@ def check_split_ratings_details():
     print(f"  Test Set:        {test_percentage:.2f}%")
 
     check_split_ratings_overlap(train_user_ratings, validation_user_ratings, test_user_ratings)
-    check_cold_start_movies(train_movie_voters, validation_movie_voters, test_movie_voters)
+    cold_start_movies=check_cold_start_movies(train_movie_voters, validation_movie_voters, test_movie_voters)
+    check_movies_with_reviews()
+
+    return cold_start_movies
+
+
+def check_movies_with_reviews():
+
+    create_json()
+    df = pd.read_json("tmdb_dataset.json")
+    with open("ratings.pkl", "rb") as f:  # get movie_voters from ratings.pkl
+        movie_voters, user_ratings, user_means = pickle.load(f)
+        del user_ratings
+        del user_means
+
+    movies_with_reviews=len(movie_voters)
+
+    print(f"\nMovies with reviews : {movies_with_reviews:,}")
+
+    percentage_movies_with_reviews=movies_with_reviews/len(df)*100
+
+    print(f"\nMovies with reviews percentage: {percentage_movies_with_reviews:.2f}%")
+
+def create_train_set_similarities_file():
+
+    directory = "experiments"
+    file_name = "train_set_similarities.pkl"
+
+    file_path = os.path.join(directory, file_name)
+
+    if os.path.exists(file_path):
+        return
+
+    with open(os.path.join(EXPERIMENTS_DIR, "ratings_split.pkl"), "rb") as f:
+        train_user_ratings, train_movie_voters, train_user_means, validation_movie_voters, validation_user_ratings, test_user_ratings, test_movie_voters = pickle.load(f)
+
+    target_movies=validation_movie_voters.keys() & train_movie_voters.keys() #We want to calculate similarities only for movies appearing in both sets
+
+    target_movie_voters={movie_index: train_movie_voters[movie_index]
+                         for movie_index in target_movies}
+
+    del train_movie_voters,validation_movie_voters, validation_user_ratings, test_user_ratings, test_movie_voters #no use, free RAM
+
+    create_similarities_file(target_movie_voters,train_user_ratings,train_user_means,10,True)
+
+def evaluate_cf_model(cold_start_movies):
+
+    #use MAE and RMSE for evaluation
+
+    directory = "experiments"
+
+    # Load training and validation data
+    with open(os.path.join(directory, "ratings_split.pkl"), "rb") as f:
+
+        (train_user_ratings,train_movie_voters,train_user_means,validation_movie_voters,validation_user_ratings,test_user_ratings,test_movie_voters) = pickle.load(f)
+
+        del train_movie_voters,validation_movie_voters,test_user_ratings,test_movie_voters
+
+    # Load similarities
+    with open(os.path.join(directory, "train_set_similarities.pkl"), "rb") as f:
+        similarities = pickle.load(f)
+
+    absolute_errors=[]
+    squared_errors=[]
+
+    total_validation_ratings=0
+    successful_predictions=0
+
+    for user_id,ratings in validation_user_ratings.items(): #for each user and rating in validation set
+
+        for movie_index,rating in ratings.items():
+
+            total_validation_ratings+=1
+
+            if movie_index not in cold_start_movies:
+
+                prediction=predict_rating(user_id,movie_index,train_user_ratings,train_user_means,similarities)
+
+                if prediction is not None:
+
+                    error = rating-prediction
+
+                    absolute_errors.append(abs(error))
+
+                    squared_errors.append(np.square(error))
+
+                    successful_predictions+=1
+
+    MAE=np.mean(absolute_errors)
+
+    RMSE=np.sqrt(np.mean(squared_errors))
+
+    coverage=successful_predictions/total_validation_ratings*100
+
+    print("\nCollaborative Filtering Evaluation:\n")
+    print(f"RMSE: {RMSE:.4f}")
+    print(f"MAE:  {MAE:.4f}")
+    print(f"Coverage: {coverage:.4f}%")
 
 
 
+if __name__=="__main__":
 
-check_split_ratings_details()
+    cold_start_movies=check_split_ratings_details()
+
+    create_train_set_similarities_file()
+
+    evaluate_cf_model(cold_start_movies)
 
 
 

@@ -5,6 +5,7 @@ import pickle
 import zipfile
 import requests
 import urllib3
+from surprise import similarities
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -83,17 +84,13 @@ def find_item_based_similarity(movie_index,movie_voters,user_ratings,user_means,
 
     del target_votes #no use anymore, free RAM
 
-    target_norm=math.sqrt(sum(r ** 2 for r in target_votes_centered.values())) # ||A||
-
-    if target_norm ==0:
-
-        return {} #avoid division by 0
-
-    movie_stats={} #{key: movie_id, value: [dot_product,norm,common_count] }
+    movie_stats={} #{key: movie_id, value: [dot_product,target_norm,other_norm,common_count] }
 
     #dot_products =  A * B
 
-    #other_norms = ||B||
+    #target_norm = ||A||
+
+    #other_norm = ||B||
 
     #common_count: number of common reviews 2 movies share
 
@@ -109,13 +106,14 @@ def find_item_based_similarity(movie_index,movie_voters,user_ratings,user_means,
 
                     if user_movie_index not in movie_stats: #If movie doesn't exist in movie_stats
 
-                        movie_stats[user_movie_index]=[diff*rating,diff**2,1]
+                        movie_stats[user_movie_index]=[diff*rating,rating**2,diff**2,1]
 
                     else: #already exists
 
                         movie_stats[user_movie_index][0] += diff*rating
-                        movie_stats[user_movie_index][1] += diff**2
-                        movie_stats[user_movie_index][2] += 1
+                        movie_stats[user_movie_index][1] += rating**2
+                        movie_stats[user_movie_index][2] += diff**2
+                        movie_stats[user_movie_index][3] += 1
 
     del target_votes_centered #no use anymore, free RAM
 
@@ -124,16 +122,18 @@ def find_item_based_similarity(movie_index,movie_voters,user_ratings,user_means,
     for movie_id,stats in  movie_stats.items():
 
         dot_product=stats[0]
-        norm=stats[1]
-        common_count=stats[2]
+        target_norm=stats[1]
+        other_norm=stats[2]
+        common_count=stats[3]
 
-        norm=math.sqrt(norm)
+        target_norm=math.sqrt(target_norm)
+        other_norm=math.sqrt(other_norm)
 
         if common_count >= common_user_required: #at least (common_user_required) common reviews between the 2 movies
 
-             if norm>0 and target_norm>0: #avoid division by zero
+             if target_norm>0 and other_norm>0: #avoid division by zero
 
-                 similarity=dot_product/ (norm *target_norm)
+                 similarity=dot_product/ (target_norm * other_norm)
 
              else:
                      similarity=0.0
@@ -144,6 +144,69 @@ def find_item_based_similarity(movie_index,movie_voters,user_ratings,user_means,
 
     return similarities
 
+def create_similarities_file(movie_voters,user_ratings,user_means,common_user_required,isExperiment): #function that creates similarities file
+
+    if isExperiment:
+
+        directory="experiments"
+        file_name="train_set_similarities.pkl"
+
+    else:
+        directory="."
+        file_name="similarities.pkl"
+
+    file_path=os.path.join(directory,file_name)
+
+    if os.path.exists(file_path):
+        return
+
+    print(f"\nCreating {file_name} . . .")
+
+    similarities={}
+
+    for movie_index in movie_voters:
+
+        similarity=find_item_based_similarity(movie_index,movie_voters,user_ratings,user_means,common_user_required)
+        similarities[movie_index]=similarity
+
+    with open(file_path,"wb") as f:
+
+        pickle.dump(similarities,f,protocol=pickle.HIGHEST_PROTOCOL)
+
+    print(f"\n{file_name} successfully created")
+
+
+
+def predict_rating(user_id,movie_index,user_ratings,user_means,similarities): #function that predicts user's reviews on movies, used for experiments
+
+    user_movie_ratings = user_ratings[user_id] #extract : {key: movie_index, value:rating} for current user
+
+    numerator=0.0
+    denominator=0.0
+
+    user_mean=user_means[user_id]
+
+    for rated_movie,rating in user_movie_ratings.items(): #for each movie with a rating
+
+        similarity=similarities[movie_index].get(rated_movie,0) #get similarity between the two movies (0 if it doesn't exist)
+
+        numerator+=similarity * (rating-user_mean)
+
+        denominator+=abs(similarity)
+
+    if denominator==0: #No similarity scores found
+
+        return None
+
+    prediction=user_mean + ( numerator/denominator )
+
+    prediction=max(prediction,0.5)
+
+    prediction=min(prediction,5)
+
+    # limit to [0.5, 5]
+
+    return prediction
 
 
 
