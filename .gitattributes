@@ -1,2 +1,5 @@
 ratings.pkl filter=lfs diff=lfs merge=lfs -text
 experiments/ratings_split.pkl filter=lfs diff=lfs merge=lfs -text
+ratings_split.pkl filter=lfs diff=lfs merge=lfs -text
+train_set_similarities.pkl filter=lfs diff=lfs merge=lfs -text
+experiments/train_set_similarities.pkl filter=lfs diff=lfs merge=lfs -text
