@@ -1,0 +1,85 @@
+Collaborative Filtering Evaluation
+=============================================
+
+Collaborative Filtering Evaluation (Without K)
+RMSE: 0.8211
+Baseline RMSE: 0.9552
+MAE: 0.6202
+Baseline MAE: 0.7369
+Coverage: 99.9159%
+---------------------------------------------
+
+Collaborative Filtering Evaluation, Using k:1
+RMSE: 1.0769
+MAE: 0.7464
+---------------------------------------------
+
+Collaborative Filtering Evaluation, Using k:3
+RMSE: 0.8902
+MAE: 0.6547
+---------------------------------------------
+
+Collaborative Filtering Evaluation, Using k:5
+RMSE: 0.8514
+MAE: 0.6325
+---------------------------------------------
+
+Collaborative Filtering Evaluation, Using k:7
+RMSE: 0.8357
+MAE: 0.6233
+---------------------------------------------
+
+Collaborative Filtering Evaluation, Using k:9
+RMSE: 0.8277
+MAE: 0.6187
+---------------------------------------------
+
+Collaborative Filtering Evaluation, Using k:11
+RMSE: 0.8231
+MAE: 0.6160
+---------------------------------------------
+
+Collaborative Filtering Evaluation, Using k:13
+RMSE: 0.8202
+MAE: 0.6145
+---------------------------------------------
+
+Collaborative Filtering Evaluation, Using k:15
+RMSE: 0.8184
+MAE: 0.6136
+---------------------------------------------
+
+Collaborative Filtering Evaluation, Using k:17
+RMSE: 0.8173
+MAE: 0.6131
+---------------------------------------------
+
+Collaborative Filtering Evaluation, Using k:19
+RMSE: 0.8165
+MAE: 0.6128
+---------------------------------------------
+
+Collaborative Filtering Evaluation, Using k:21
+RMSE: 0.8159
+MAE: 0.6126
+---------------------------------------------
+
+Collaborative Filtering Evaluation, Using k:31
+RMSE: 0.8152
+MAE: 0.6129
+---------------------------------------------
+
+Collaborative Filtering Evaluation, Using k:51
+RMSE: 0.8160
+MAE: 0.6143
+---------------------------------------------
+
+Collaborative Filtering Evaluation, Using k:71
+RMSE: 0.8169
+MAE: 0.6155
+---------------------------------------------
+
+Collaborative Filtering Evaluation, Using k:91
+RMSE: 0.8177
+MAE: 0.6164
+---------------------------------------------
