@@ -5,6 +5,7 @@ import pickle
 import zipfile
 import requests
 import urllib3
+import numpy as np
 from surprise import similarities
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -195,6 +196,49 @@ def predict_rating(user_id,movie_index,user_ratings,user_means,similarities): #f
         denominator+=abs(similarity)
 
     if denominator==0: #No similarity scores found
+
+        return None
+
+    prediction=user_mean + ( numerator/denominator )
+
+    prediction=max(prediction,0.5)
+
+    prediction=min(prediction,5)
+
+    # limit to [0.5, 5]
+
+    return prediction
+
+
+def predict_rating_k(user_id,movie_index,user_ratings,user_means,similarities,k): #function that predicts user's reviews on movies (using k-NN), used for experiments
+
+    user_movie_ratings = user_ratings[user_id] #extract : {key: movie_index, value:rating} for current user
+
+    user_mean=user_means[user_id]
+
+    rated_movies=list(user_movie_ratings.keys()) # movie indices, convert to list for numpy compatibility
+
+    ratings=np.array(list(user_movie_ratings.values())) # movie ratings convert to list,then np.array for numpy compatibility
+
+    movie_similarities=np.array([similarities[movie_index].get(rated_movie,0) #get all similarities of movie_index
+                                 for rated_movie in rated_movies])
+
+    k=min(k,len(movie_similarities)) #In case we have less similarities than given k
+
+    if not np.any(movie_similarities>0): #if all similarities are 0
+
+        return None
+
+    top_k_indices=np.argpartition(movie_similarities,-k)[-k:] #get top k similarities
+
+    movie_similarities=movie_similarities[top_k_indices]
+    ratings=ratings[top_k_indices]
+
+    numerator=np.sum(movie_similarities * (ratings-user_mean))
+
+    denominator=np.sum(movie_similarities)
+
+    if denominator == 0:  # No similarity scores found
 
         return None
 

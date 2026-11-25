@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pickle
 import os
-from cf import create_ratings_file,create_similarities_file,predict_rating
+from cf import create_ratings_file,create_similarities_file,predict_rating,predict_rating_k
 from main import create_json
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -281,7 +281,17 @@ def create_train_set_similarities_file():
 
     create_similarities_file(target_movie_voters,train_user_ratings,train_user_means,10,True)
 
-def evaluate_cf_model(cold_start_movies):
+def evaluate_cf_model(cold_start_movies): #function that evaluates cf_model, using MAE and RMSE, using different k's
+
+    results_file=os.path.join(EXPERIMENTS_DIR, "cf_evaluation.txt") #create file with results
+
+    if os.path.exists(results_file):
+        print("Check cf_evaluation.txt for results")
+        return
+
+    with open(results_file, "w", encoding="utf-8") as f:
+        f.write("Collaborative Filtering Evaluation\n")
+        f.write("=" * 45 + "\n")
 
     #use MAE and RMSE for evaluation
 
@@ -292,49 +302,106 @@ def evaluate_cf_model(cold_start_movies):
 
         (train_user_ratings,train_movie_voters,train_user_means,validation_movie_voters,validation_user_ratings,test_user_ratings,test_movie_voters) = pickle.load(f)
 
-        del train_movie_voters,validation_movie_voters,test_user_ratings,test_movie_voters
+        del validation_movie_voters,test_user_ratings,test_movie_voters
 
     # Load similarities
     with open(os.path.join(directory, "train_set_similarities.pkl"), "rb") as f:
         similarities = pickle.load(f)
 
-    absolute_errors=[]
-    squared_errors=[]
 
-    total_validation_ratings=0
-    successful_predictions=0
+    movies_means={movie_index : np.mean(list(movie_voters.values())) #Baseline for to compare predictions with (mean of movies ratings)
+                  for movie_index,movie_voters in train_movie_voters.items()}
 
-    for user_id,ratings in validation_user_ratings.items(): #for each user and rating in validation set
+    k_values=[None,1,3,5,7,9,11,13,15,17,19,21,31,51,71,91]
 
-        for movie_index,rating in ratings.items():
+    first_iteration = True #Calculate coverage and baseline errors, only on first iteration since they stay the same
 
-            total_validation_ratings+=1
+    for k in k_values:
 
-            if movie_index not in cold_start_movies:
+        absolute_errors = []
+        squared_errors = []
 
-                prediction=predict_rating(user_id,movie_index,train_user_ratings,train_user_means,similarities)
+        if first_iteration:
+            baseline_absolute_errors = []
+            baseline_squared_errors = []
 
-                if prediction is not None:
+            successful_predictions = 0
+            total_validation_ratings = 0
 
-                    error = rating-prediction
+        for user_id,ratings in validation_user_ratings.items(): #for each user and rating in validation set
 
-                    absolute_errors.append(abs(error))
+            for movie_index,rating in ratings.items():
 
-                    squared_errors.append(np.square(error))
+                if movie_index not in cold_start_movies:
 
-                    successful_predictions+=1
+                    if first_iteration:
 
-    MAE=np.mean(absolute_errors)
+                        total_validation_ratings += 1
 
-    RMSE=np.sqrt(np.mean(squared_errors))
+                    if k is not None:
 
-    coverage=successful_predictions/total_validation_ratings*100
+                        prediction=predict_rating_k(user_id,movie_index,train_user_ratings,train_user_means,similarities,k)
 
-    print("\nCollaborative Filtering Evaluation:\n")
-    print(f"RMSE: {RMSE:.4f}")
-    print(f"MAE:  {MAE:.4f}")
-    print(f"Coverage: {coverage:.4f}%")
+                    else:
+                        prediction=predict_rating(user_id,movie_index,train_user_ratings,train_user_means,similarities)
 
+                    if prediction is not None:
+
+                        if first_iteration:
+
+                            baseline_prediction = movies_means[movie_index]
+
+                            baseline_error = rating - baseline_prediction
+
+                            baseline_absolute_errors.append(abs(baseline_error))
+
+                            baseline_squared_errors.append(np.square(baseline_error))
+
+                            successful_predictions += 1
+
+                        error = rating-prediction
+
+                        absolute_errors.append(abs(error))
+
+                        squared_errors.append(np.square(error))
+
+        MAE=np.mean(absolute_errors)
+
+        RMSE=np.sqrt(np.mean(squared_errors))
+
+        if first_iteration:
+
+            baseline_MAE=np.mean(baseline_absolute_errors)
+
+            baseline_RMSE=np.sqrt(np.mean(baseline_squared_errors))
+
+            coverage=successful_predictions/total_validation_ratings*100
+
+        if k is not None:
+            title=f"Collaborative Filtering Evaluation, Using k:{k}"
+
+        else:
+            title="Collaborative Filtering Evaluation (Without K)"
+
+        if first_iteration:
+            result =( f"\n{title}\n"
+                f"RMSE: {RMSE:.4f}\n"
+                f"Baseline RMSE: {baseline_RMSE:.4f}\n"
+                f"MAE: {MAE:.4f}\n"
+                f"Baseline MAE: {baseline_MAE:.4f}\n"
+                f"Coverage: {coverage:.4f}%\n"
+                + "-" * 45 + "\n")
+        else:
+            result = (f"\n{title}\n"
+                      f"RMSE: {RMSE:.4f}\n"
+                      f"MAE: {MAE:.4f}\n"
+                      + "-" * 45 + "\n")
+
+        first_iteration=False
+
+        print(result)
+        with open(results_file, "a", encoding="utf-8") as f:
+            f.write(result)
 
 
 if __name__=="__main__":
